@@ -83,26 +83,36 @@ T_indigena<- raster("Indigenous Territories.tif")
 PU<-raster("Planning_units_buffer.tif")
 
 ## Preparing layers for each zone
+
+
+
+###Zone 1: only need to change agriculture value
+agricutlrure1 <- agricutlrure*0
+
+###Zone 2: 
+
 Biodiversity2 <-Biodiversity*2
-Biodiversity3 <-Biodiversity*0.5
 PA2<-PA*2
-PA3<-PA*0.5
 T_indigena2<-T_indigena*2
-T_indigena3<-T_indigena*0.5
 bio_corridors2<-bio_corridors*2
-bio_corridors3<-bio_corridors*0.5
 forest_reserv2<-forest_reserv*2
-forest_reserv3<-forest_reserv*0.5
-wetlands2<-wetlands*1.5
-wetlands3<-wetlands*0.5
 import_hidrica2<- import_hidrica*1.5
-import_hidrica3<- import_hidrica*0.5
 carbon2 <- carbon*1.5
+water_q2<- water_q*1.5
+wetlands2<-wetlands*1.5
+
+###Zone 3:
+
+Biodiversity3 <-Biodiversity*0.5
+PA3<-PA*0.5
+T_indigena3<-T_indigena*0.5
+bio_corridors3<-bio_corridors*0.5
+forest_reserv3<-forest_reserv*0.5
+wetlands3<-wetlands*0.5
+import_hidrica3<- import_hidrica*0.5
 carbon3<-carbon*0.5
 organic_s3 <- organic_s*0.75
-water_q2<- water_q*1.5
 water_q3<- water_q*0.75
-agricutlrure1 <- agricutlrure*0
 Mangroves3<- Mangroves*0
 
 
@@ -129,45 +139,49 @@ budget<-c(53290,53290,53290)
 ##Create planning units stack with the cost layers
 
 pu1 <- stack(PU, PU,PU)
+names(pu1) <- c("zone_1", "zone_2", "zone_3")
+
+##I included in each zone, all three zone layers (low, medium and high HFP)
+
 zn1<-stack(Biodiversity,import_hidrica,carbon ,organic_s ,
            water_q,agricutlrure1 ,Mangroves, wetlands,bio_corridors,
-           PA,forest_reserv,T_indigena,species,HFP_in)
+           PA,forest_reserv,T_indigena,HFP_in,HFP_res*0,HFP_mg*0)
 zn2<-stack(Biodiversity2,import_hidrica2,carbon2 ,organic_s ,
            water_q2,agricutlrure1 ,Mangroves, wetlands2,bio_corridors2,
-           PA2,forest_reserv2,T_indigena2,species,HFP_res)
+           PA2,forest_reserv2,T_indigena2,HFP_in*0,HFP_res,HFP_mg*0)
 zn3<-stack(Biodiversity3,import_hidrica3,carbon3 ,organic_s3 ,
            water_q3,agricutlrure ,Mangroves3, wetlands3,bio_corridors3,
-           PA3,forest_reserv3,T_indigena3,species,HFP_mg)
+           PA3,forest_reserv3,T_indigena3,HFP_in*0,HFP_res*0,HFP_mg)
 
 
 ### Create Zone file
 
-z2 <- zones("zone 1" = zn1, "zone 2" = zn2,  "zone 3" = zn3)
-# each cell value corresponds to the target 10%
-t2 <- matrix(NA, ncol = 3, nrow = 113)
-t2[1:113, 1] <- 0.1
-t2[1:113, 2] <- 0.1
-t2[1:113, 3] <- 0.1
-
-t2[113,1]<-0.3
-t2[113,2]<-0.1
-t2[113,3]<-0.4
-t2[113,]
-
-t4 <- tibble::tibble(feature = c(names(zn1)[-113], rep("layer", 3)),
-                     zone = c(list(c("zone 1", "zone 2", "zone 3"))[rep(1,112)], "zone 1", "zone 2", "zone 3"),
-                     target = c(rep(0.1, 112), 0.3, 0.1, 0.4),
-                     type = rep("relative", 115))
+z2 <- zones("zone_1" = zn1, "zone_2" = zn2,  "zone_3" = zn3)
 
 
+## Setting overall targets:
 
-p1 <-  problem(pu1, z2) %>%
+t4 <- tibble::tibble(feature = names(zn1),
+                     zone = list(names(pu1))[rep(1, 15)],
+                     target = c(rep(0.1, 12), 0.3, 0.2, 0.3),
+                     type = rep("relative", 15))
+##Problem
+
+p4 <- problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+                         "zone_3" = zn3,
+                         feature_names = names(zn1))) %>%
+  add_boundary_penalties(penalty = 0.00001) %>%
   add_min_set_objective() %>%
   add_manual_targets(t4) %>%
-  add_binary_decisions() %>%
-  add_gurobi_solver()
+  add_binary_decisions()
 
-s1 <- solve(p1, run_checks=FALSE, force=TRUE)
+s<-solve(p4, force=TRUE) # It was giving me a message saying: Warning in presolve_check.OptimizationProblem(compile(x)) :
+                         #features target values are (relatively) very high
+
+plot(category_layer(s), main="solution")
+fr <- feature_representation(p4, s)
+fr[1:15,]
+
 
 ## Matrix for clumping rules.
 # print stack
@@ -181,20 +195,22 @@ z6[2, 3] <- 1
 z6[3, 2] <- 1
 
 z6
-colnames(z6) <- c("zn1","zn2","zn3")
+colnames(z6) <- c("zone_1", "zone_2", "zone_3")
 rownames(z6) <- colnames(z6)
 
 
 
-p1 <-  problem(pu1, z2, run_checks=FALSE) %>%
-  add_max_features_objective(budget) %>%
-  add_relative_targets(t2) %>%
-  add_binary_decisions()%>%
+p1 <-   problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+                           "zone_3" = zn3,
+                           feature_names = names(zn1))) %>%
+  add_min_set_objective() %>%
+  add_manual_targets(t4) %>%
+  add_binary_decisions()
   add_boundary_penalties(penalty=0.00001, zones = z6)%>%
-  add_gurobi_solver()
+  add_gurobi_solver(gap=10)
 
 s1 <- solve(p1, run_checks=FALSE, force=TRUE)
 setMinMax(s1)
-plot(category_layer(s1), main="solution")
+plot(category_layer(s), main="solution")
 
 fr <- feature_representation(p1, s1)
