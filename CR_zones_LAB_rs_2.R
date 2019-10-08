@@ -129,9 +129,11 @@ species3<-species*0.5
 #cost<-HFP #If we want to avoid areas with high human prossure
 PU<-(PU/PU) #In this case, cost is the same across the landscape
 #Create zonal layers
-HFP_in<-HFP<4
+# HFP < 14 ~ 50% of country
+
+HFP_in <- HFP < 14
 plot(HFP_in,add=TRUE)
-HFP_res<-HFP>4&HFP<20
+HFP_res <- HFP >= 14 & HFP < 20
 plot(HFP_res)
 HFP_mg<-HFP<20
 plot(HFP_mg)
@@ -139,6 +141,11 @@ HFP_BAU<-HFP>=20
 plot(HFP_BAU)
 
 cellStats(PU,"sum")
+
+#get country specific target value
+count_tar <- function(target = NULL){
+  round(cellStats(PU,"sum") / 100 * target, 0)
+}
 
 
 ##Create planning units stack with the cost layers
@@ -295,7 +302,92 @@ plot(category_layer(CR_Toff_stack[[1:4]]))
 
 writeRaster(CR_Toff_stack,"CR_Toff_stack.tif", overwrite=TRUE)
 
-                         
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx                         
+# Max utility
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx                         
+
+
+#cost<-HFP #If we want to avoid areas with high human prossure
+PU<-(PU/PU) #In this case, cost is the same across the landscape
+#Create zonal layers
+
+# HFP < 14 ~ 50% of country
+HFP_in <- HFP < 14
+HFP_in[HFP_in < 1] <- NA
+plot(HFP_in)
+HFP_res <- HFP >= 14 & HFP < 20
+HFP_res[HFP_res < 1] <- NA
+plot(HFP_res)
+HFP_mg<-HFP<20
+HFP_mg[HFP_mg < 1] <- NA
+plot(HFP_mg)
+HFP_BAU<-HFP>=20
+HFP_BAU[HFP_BAU < 1] <- NA
+plot(HFP_BAU)
+
+cellStats(PU,"sum")
+
+#get country specific target value
+count_tar <- function(target = NULL){
+  round(cellStats(PU,"sum") / 100 * target, 0)
+}
+
+
+##Create planning units stack with the cost layers
+
+pu1 <- stack(HFP_in, HFP_res, HFP_mg, HFP_BAU)
+names(pu1) <- c("zone_1", "zone_2", "zone_3", "zone_4")
+
+##I included in each zone, all three zone layers (low, medium and high HFP)
+
+zn1<-stack(Biodiversity,import_hidrica,carbon ,organic_s ,
+           water_q,agricutlrure1 ,Mangroves, wetlands,bio_corridors)#,
+           # PA,forest_reserv,T_indigena,
+           # HFP_in,HFP_res*0,HFP_mg*0,HFP_BAU*0)
+zn2<-stack(Biodiversity2,import_hidrica2,carbon2 ,organic_s ,
+           water_q2,agricutlrure1 ,Mangroves, wetlands2,bio_corridors2)#,
+           # PA2,forest_reserv2,T_indigena2,
+           # HFP_in*0,HFP_res,HFP_mg*0,HFP_BAU*0)
+zn3<-stack(Biodiversity3,import_hidrica3,carbon3 ,organic_s3 ,
+           water_q3,agricutlrure ,Mangroves3, wetlands3,bio_corridors3)#,
+           # PA3,forest_reserv3,T_indigena3,
+           # HFP_in*0,HFP_res*0,HFP_mg,HFP_BAU*0)
+zn4<-stack(Biodiversity3*0,import_hidrica3*0,carbon3*0 ,organic_s3*0 ,
+           water_q3*0,agricutlrure ,Mangroves3*0, wetlands3*0,bio_corridors3*0)#,
+           # PA3*0,forest_reserv3*0,T_indigena3*0,
+           # HFP_in*0,HFP_res*0,HFP_mg,HFP_BAU)
+
+### Create Zone file
+
+z2 <- zones("zone_1" = zn1, "zone_2" = zn2,  "zone_3" = zn3, "zone_4" = zn4)
+
+
+## Setting overall targets:
+# 
+t4 <- tibble::tibble(feature = names(zn1),
+                     zone = list(names(pu1))[rep(1, 13)],
+                     target = c(rep(0.2, 9), 0.3, 0.2, 0.2,0.3),
+                     type = rep("relative", 13))
+
+t4
+
+# parallelization
+
+p1 <-   problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+                           "zone_3" = zn3,"zone_4" = zn4,
+                           feature_names = names(zn1))) %>%
+  # add_min_set_objective() %>%
+  # add_manual_targets(t4) %>%
+  add_max_utility_objective(c(count_tar(20), count_tar(5), count_tar(10), 1)) %>%
+  # add_binary_decisions()%>%
+  # add_proportion_decisions %>%
+  # add_boundary_penalties(penalty = 0.0000001)%>%
+  add_gurobi_solver(gap = 0, threads = n_cores)
+
+s1 <- solve(p1, force=TRUE)
+setMinMax(s1)
+plot(category_layer(s1), main="solution")
+
                          
 
 # clean up
