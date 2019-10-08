@@ -384,17 +384,33 @@ zn4<-stack(Biodiversity3 * 0,
 ### Create Zone file
 z2 <- zones("zone_1" = zn1, "zone_2" = zn2,  "zone_3" = zn3, "zone_4" = zn4)
 
-p1 <-   problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+p1 <- problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
                            "zone_3" = zn3,"zone_4" = zn4,
                            feature_names = names(zn1))) %>%
-  add_max_utility_objective(c(count_tar(20), count_tar(5), count_tar(10), 1)) %>%
+  add_max_utility_objective(c(count_tar(20), count_tar(5), count_tar(10), count_tar(65))) %>%
   add_gurobi_solver(gap = 0, threads = n_cores)
 
 s1 <- solve(p1, force=TRUE)
 setMinMax(s1)
-plot(category_layer(s1), main="solution")
+plot(category_layer(s1), main="global")
 
-                         
 
+w1 <- matrix(0, ncol = nlayers(pu1), nrow = nlayers(zn1))                     
+w1[1,] <- 1
+
+p2 <-   problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2,
+                           "zone_3" = zn3,"zone_4" = zn4,
+                           feature_names = names(zn1))) %>%
+  add_max_utility_objective(c(count_tar(20 / nlayers(zn1)), count_tar(5 / nlayers(zn1)), count_tar(10 / nlayers(zn1)), 1)) %>%
+  add_feature_weights(w1) %>%
+  add_gurobi_solver(gap = 0, threads = n_cores)
+
+# p2 <- p1 %>% add_feature_weights(w1)
+s2 <- solve(p2, force=TRUE)
+setMinMax(s2)
+plot(category_layer(s2), main="BII red")
+
+writeRaster(category_layer(s1), filename=here("output", "global.tif"), options="INTERLEAVE=BAND", overwrite=TRUE)
+writeRaster(category_layer(s2), filename=here("output", "BII.tif"), options="INTERLEAVE=BAND", overwrite=TRUE)
 # clean up
 stopCluster(cl)
