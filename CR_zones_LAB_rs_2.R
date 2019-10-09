@@ -410,7 +410,104 @@ s2 <- solve(p2, force=TRUE)
 setMinMax(s2)
 plot(category_layer(s2), main="BII red")
 
-writeRaster(category_layer(s1), filename=here("output", "global.tif"), options="INTERLEAVE=BAND", overwrite=TRUE)
-writeRaster(category_layer(s2), filename=here("output", "BII.tif"), options="INTERLEAVE=BAND", overwrite=TRUE)
+# writeRaster(category_layer(s1), filename=here("output", "global.tif"), options="INTERLEAVE=BAND", overwrite=TRUE)
+# writeRaster(category_layer(s2), filename=here("output", "BII.tif"), options="INTERLEAVE=BAND", overwrite=TRUE)
 # clean up
+
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx                         
+# P 25 R 5 M 10
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx     
+p1_glob <- problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+                         "zone_3" = zn3,"zone_4" = zn4,
+                         feature_names = names(zn1))) %>%
+  add_max_utility_objective(c(count_tar(25), count_tar(5), count_tar(10), count_tar(65))) %>%
+  add_gurobi_solver(gap = 0, threads = n_cores)
+
+s1_glob <- solve(p1_glob, force=TRUE)
+# setMinMax(s1_glob)
+# plot(category_layer(s1_glob), main="global")
+writeRaster(category_layer(s1_glob), filename=here("output", "P25R5M10_global.tif"), overwrite=TRUE)
+
+
+for(ii in 1:nlayers(zn1)){
+
+  if(!names(zn1)[ii] == "Agriculture_Suitability"){
+    w1 <- matrix(0, ncol = nlayers(pu1), nrow = nlayers(zn1))                     
+    w1[ii,] <- 1
+    
+    for(jj in 1:100){
+      p1_tmp <-   p1_glob %>% 
+        add_max_utility_objective(c(count_tar(jj * 25 / ((nlayers(zn1) - 1) * 100)), 
+                                    count_tar(jj * 5 / ((nlayers(zn1) - 1) * 100)), 
+                                    count_tar(jj * 10 / ((nlayers(zn1) - 1) * 100)), 
+                                    100)) %>%
+        add_feature_weights(w1)
+      s1_tmp <- solve(p1_tmp, force=TRUE)
+      # setMinMax(s1_tmp)
+       # plot(category_layer(s1_tmp), main="BII red")
+      
+      writeRaster(category_layer(s1_tmp), 
+                  filename=here("output", paste0("P25R5M10_", names(zn1)[ii], sprintf("_%03d.tif", jj))), 
+                  overwrite=TRUE)
+      
+      rm(p1_tmp, s1_tmp)
+    }
+    
+  }
+  
+}
+
+
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx                         
+# P 35 R 10 M 20
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx     
+p2_glob <- problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+                              "zone_3" = zn3,"zone_4" = zn4,
+                              feature_names = names(zn1))) %>%
+  add_max_utility_objective(c(count_tar(35), count_tar(10), count_tar(20), count_tar(35))) %>%
+  add_gurobi_solver(gap = 0, threads = n_cores)
+
+s2_glob <- solve(p2_glob, force=TRUE)
+# setMinMax(s2_glob)
+# plot(category_layer(s2_glob), main="global")
+writeRaster(category_layer(s2_glob), filename=here("output", "P35R10M20_global.tif"), overwrite=TRUE)
+
+
+for(ii in 1:nlayers(zn1)){
+  
+  if(!names(zn1)[ii] == "Agriculture_Suitability"){
+    w1 <- matrix(0, ncol = nlayers(pu1), nrow = nlayers(zn1))                     
+    w1[ii,] <- 1
+    
+    for(jj in 1:100){
+      p2_tmp <-   p2_glob %>% 
+        add_max_utility_objective(c(count_tar(jj * 35 / ((nlayers(zn1) - 1) * 100)), 
+                                    count_tar(jj * 10 / ((nlayers(zn1) - 1) * 100)), 
+                                    count_tar(jj * 20 / ((nlayers(zn1) - 1) * 100)), 
+                                    100)) %>%
+        add_feature_weights(w1)
+      s2_tmp <- solve(p2_tmp, force=TRUE)
+      # setMinMax(s2_tmp)
+      # plot(category_layer(s2_tmp), main="BII red")
+      
+      writeRaster(category_layer(s2_tmp), 
+                  filename=here("output", paste0("P35R10M20_", names(zn1)[ii], sprintf("_%03d.tif", jj))), 
+                  overwrite=TRUE)
+      
+      rm(p2_tmp, s2_tmp)
+    }
+    
+  }
+  
+}
+
+
+
+
+
+
+
+
+
+
 stopCluster(cl)
