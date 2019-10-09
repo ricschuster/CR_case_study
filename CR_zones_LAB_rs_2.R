@@ -501,8 +501,87 @@ for(ii in 1:nlayers(zn1)){
   
 }
 
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx                         
+# Trade-offs
+#xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 
+p3_glob <- problem(pu1, zones("zone_1" = zn1, "zone_2" = zn2, 
+                              "zone_3" = zn3,"zone_4" = zn4,
+                              feature_names = names(zn1))) %>%
+  add_max_utility_objective(c(count_tar(35), count_tar(10), count_tar(20), count_tar(35))) %>%
+  add_gurobi_solver(gap = 0, threads = n_cores)
+
+s3_glob <- solve(p3_glob, force=TRUE)
+# setMinMax(s3_glob)
+# plot(category_layer(s3_glob), main="global")
+writeRaster(category_layer(s3_glob), filename=here("output_trade_off", "P35R10M20_global.tif"), overwrite=TRUE)
 
 
+# Biod
+w1 <- matrix(0, ncol = nlayers(pu1), nrow = nlayers(zn1))                     
+w1[c(1,8,9),] <- 1
+
+for(jj in 1:100){
+  p3_tmp <-   p3_glob %>% 
+    add_max_utility_objective(c(count_tar(jj * 35 / (3 * 100)), 
+                                count_tar(jj * 10 / (3 * 100)), 
+                                count_tar(jj * 20 / (3 * 100)), 
+                                100)) %>%
+    add_feature_weights(w1)
+  s3_tmp <- solve(p3_tmp, force=TRUE)
+  # setMinMax(s3_tmp)
+  # plot(category_layer(s3_tmp), main="BII red")
+  
+  writeRaster(category_layer(s3_tmp), 
+              filename=here("output_trade_off", paste0("P35R10M20_Biod", sprintf("_%03d.tif", jj))), 
+              overwrite=TRUE)
+  
+  rm(p3_tmp, s3_tmp)
+}
+
+# ES - Carb
+w1 <- matrix(0, ncol = nlayers(pu1), nrow = nlayers(zn1))                     
+w1[c(2,5,7),] <- 1
+
+for(jj in 1:100){
+  p3_tmp <-   p3_glob %>% 
+    add_max_utility_objective(c(count_tar(jj * 35 / (3 * 100)), 
+                                count_tar(jj * 10 / (3 * 100)), 
+                                count_tar(jj * 20 / (3 * 100)), 
+                                100)) %>%
+    add_feature_weights(w1)
+  s3_tmp <- solve(p3_tmp, force=TRUE)
+  # setMinMax(s3_tmp)
+  # plot(category_layer(s3_tmp), main="BII red")
+  
+  writeRaster(category_layer(s3_tmp), 
+              filename=here("output_trade_off", paste0("P35R10M20_ES_no_carb", sprintf("_%03d.tif", jj))), 
+              overwrite=TRUE)
+  
+  rm(p3_tmp, s3_tmp)
+}
+
+
+# ES
+w1 <- matrix(0, ncol = nlayers(pu1), nrow = nlayers(zn1))                     
+w1[c(2,3,4,5,7),] <- 1
+
+for(jj in 1:100){
+  p3_tmp <-   p3_glob %>% 
+    add_max_utility_objective(c(count_tar(jj * 35 / (3 * 100)), 
+                                count_tar(jj * 10 / (3 * 100)), 
+                                count_tar(jj * 20 / (3 * 100)), 
+                                100)) %>%
+    add_feature_weights(w1)
+  s3_tmp <- solve(p3_tmp, force=TRUE)
+  # setMinMax(s3_tmp)
+  # plot(category_layer(s3_tmp), main="BII red")
+  
+  writeRaster(category_layer(s3_tmp), 
+              filename=here("output_trade_off", paste0("P35R10M20_ES", sprintf("_%03d.tif", jj))), 
+              overwrite=TRUE)
+  
+  rm(p3_tmp, s3_tmp)
+}
 
 
 
