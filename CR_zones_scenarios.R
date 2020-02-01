@@ -218,7 +218,7 @@ t4
 # rownames(z6) <- colnames(z6)
 
 # parallelization
-n_cores <- 12
+n_cores <- 6
 cl <- makeCluster(n_cores)
 registerDoParallel(cl)
 
